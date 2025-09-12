@@ -1,9 +1,6 @@
-library(shiny)
-library(bslib)
-library(DT)
-library(dplyr)
-library(googlesheets4)
+pacman::p_load(shiny, bslib, DT, tidyverse, googlesheets4)
 
+# helper function to set up links in DT
 mk_links <- function(df, text = "link") {
   df %>%
     mutate(
@@ -20,8 +17,8 @@ mk_links <- function(df, text = "link") {
 }
 idify <- function(x) gsub("[^a-z0-9]+", "_", tolower(x))
 
-light <- bs_theme(version = 5, bootswatch = "cosmo")
-dark <- bs_theme(version = 5, bootswatch = "darkly")
+
+# UI ----------------------------------------------------------------------
 
 ui <- fluidPage(
   theme = bs_theme(version = 5, bootswatch = "litera"),
@@ -35,7 +32,14 @@ ui <- fluidPage(
   ))
 )
 
+
+# SERVER ------------------------------------------------------------------
+
 server <- function(input, output, session) {
+  
+  # Set up creds
+  options(gargle_oauth_cache = ".secrets")
+  gs4_auth(cache = ".secrets", email = TRUE)
   sheet_id <- Sys.getenv("GS_ID")
   target_tab <- "mc_results"
 
