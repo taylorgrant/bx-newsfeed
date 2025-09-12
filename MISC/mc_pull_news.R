@@ -1,13 +1,30 @@
 # Function to pull stories from MediaCloud #
 get_news <- function() {
+  
+  # googlesheets auth
+  options(
+    gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
+    gargle_oauth_client_type = "web",
+    gargle_oauth_email = TRUE
+    # gargle_verbosity = "debug"
+  )
+  # googledrive::drive_auth()
+  
+  
   mc_news_pull <- function(qq) {
+    # set the python environment used by reticulate
+    reticulate::use_python(
+      "/home/rstudio/.local/share/r-miniconda/envs/bx-newsfeed/bin/python",
+      required = TRUE
+    )
+    
     library(reticulate)
     # libraries
     os <- import("os")
     mediacloud.api <- import("mediacloud.api")
     dt <- import("datetime")
     # Set the date of the query
-    today_r <- Sys.Date()
+    today_r <- as.Date(as.POSIXlt(Sys.time(), tz = "America/Los_Angeles")) # convert UTC to PDT
     today_py <- dt$date(
       as.integer(format(today_r, "%Y")),
       as.integer(format(today_r, "%m")),
@@ -52,25 +69,26 @@ get_news <- function() {
 
   # Convert list of lists to tibble
   stories_to_df <- function(stories) {
-    if (is.null(stories) || length(stories) == 0) {
-      return(EMPTY_DF)
-    }
-    purrr::map_dfr(stories, function(x) {
+    if (is.null(stories) || length(stories) == 0) return(EMPTY_DF)
+    
+    df <- purrr::map_dfr(stories, function(x) {
       tibble::tibble(
-        language = x$language %||% NA_character_,
-        media_name = x$media_name %||% NA_character_,
-        publish_date = x$publish_date %||% NA_character_,
-        source = x$media_name %||% NA_character_,
-        title = x$title %||% NA_character_,
-        url = x$url %||% NA_character_
+        language     = as.character(rlang::`%||%`(x$language, NA_character_)),
+        media_name   = as.character(rlang::`%||%`(x$media_name, NA_character_)),
+        publish_date = as.character(rlang::`%||%`(x$publish_date, NA_character_)),  # <-- force chr
+        source       = as.character(rlang::`%||%`(x$media_name, NA_character_)),
+        title        = as.character(rlang::`%||%`(x$title, NA_character_)),
+        url          = as.character(rlang::`%||%`(x$url, NA_character_))
       )
     })
+    df
   }
 
   # Queries to use
   queries <- c(
     "blackstone language:en",
     "kkr language:en",
+    '"apollo management" language:en',
     '"carlyle group" language:en',
     "tpg language:en",
     '"blue owl" language:en',
@@ -80,6 +98,7 @@ get_news <- function() {
   )
 
   results <- purrr::map(queries, function(q) {
+    message(sprintf("[get_news] %s — pulling: %s", Sys.time(), q))
     stories <- mc_news_pull(q) # pull
     out <- stories_to_df(stories) # convert to tibble
     Sys.sleep(60)
@@ -89,6 +108,7 @@ get_news <- function() {
       nm = c(
         "Blackstone",
         "KKR",
+        "Apollo Management",
         "Carlyle Group",
         "TPG",
         "Blue Owl",
@@ -103,7 +123,7 @@ get_news <- function() {
     dplyr::distinct(url, .keep_all = TRUE) |>
     dplyr::arrange(publish_date)
 
-  sheet_id <- Sys.getenv("GS_ID")
+  sheet_id <- Sys.getenv("MEDIACLOUD_GS_ID")
   target_tab <- "mc_results"
 
   # Read only existing URLs (fast)
