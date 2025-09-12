@@ -1,8 +1,4 @@
-library(shiny)
-library(bslib)
-library(DT)
-library(dplyr)
-library(googlesheets4)
+pacman::p_load(shiny, bslib, DT, tidyverse, googlesheets4)
 
 mk_links <- function(df, text = "link") {
   df %>%
