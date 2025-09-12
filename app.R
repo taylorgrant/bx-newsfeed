@@ -3,8 +3,8 @@ pacman::p_load(shiny, bslib, DT, tidyverse, googlesheets4)
 # helper function to set up links in DT
 mk_links <- function(df, text = "link") {
   df %>%
-    mutate(
-      link = if_else(
+    dplyr::mutate(
+      link = dplyr::if_else(
         !is.na(url) & nzchar(url),
         sprintf(
           '<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
@@ -20,12 +20,12 @@ idify <- function(x) gsub("[^a-z0-9]+", "_", tolower(x))
 
 # UI ----------------------------------------------------------------------
 
-ui <- fluidPage(
-  theme = bs_theme(version = 5, bootswatch = "litera"),
-  titlePanel("Blackstone News Feed"),
-  tabsetPanel(
+ui <- shiny::fluidPage(
+  theme = bslib::bs_theme(version = 5, bootswatch = "litera"),
+  shiny::titlePanel("Blackstone News Feed"),
+  shiny::tabsetPanel(
     id = "tabs",
-    tabPanel("Today", DTOutput("tbl_today")) # we'll append the rest
+    shiny::tabPanel("Today", DT::DTOutput("tbl_today")) # we'll append the rest
   ),
   tags$style(HTML(
     ".dataTables_wrapper .dataTables_paginate { margin-top: .5rem; }"
@@ -36,29 +36,35 @@ ui <- fluidPage(
 # SERVER ------------------------------------------------------------------
 
 server <- function(input, output, session) {
-  
   # Set up creds
   options(gargle_oauth_cache = ".secrets")
-  gs4_auth(cache = ".secrets", email = TRUE)
-  sheet_id <- Sys.getenv("GS_ID")
+  googlesheets4::gs4_auth(cache = ".secrets", email = TRUE)
+  sheet_id <- Sys.getenv("MEDIACLOUD_GS_ID")
   target_tab <- "mc_results"
 
   # Read ONCE at startup
   data_all <- suppressMessages(
-    read_sheet(ss = sheet_id, sheet = target_tab)
+    googlesheets4::read_sheet(ss = sheet_id, sheet = target_tab)
   ) %>%
-    mutate(publish_date = as.Date(publish_date))
+    dplyr::mutate(publish_date = as.Date(publish_date))
 
   # Today table
-  output$tbl_today <- renderDT({
+  output$tbl_today <- DT::renderDT({
     df <- data_all %>%
-      filter(publish_date == Sys.Date()) %>%
-      arrange(desc(publish_date)) %>%
+      dplyr::filter(publish_date == Sys.Date()) %>%
+      dplyr::arrange(desc(publish_date)) %>%
       mk_links()
     if (nrow(df) == 0) {
-      df <- data_all[0, ]
+      # df <- data_all[0, ]
+      return(
+        DT::datatable(
+          data.frame(Message = "No stories found for today."),
+          rownames = FALSE,
+          options = list(dom = 't', paging = FALSE) # just show the message
+        )
+      )
     }
-    datatable(
+    DT::datatable(
       df[, c("publish_date", "query", "source", "title", "link", "url")],
       escape = FALSE,
       rownames = FALSE,
@@ -78,11 +84,11 @@ server <- function(input, output, session) {
 
     # render its table
     df_q <- by_query[[q]] %>%
-      arrange(desc(publish_date)) %>%
+      dplyr::arrange(desc(publish_date)) %>%
       mk_links()
 
-    output[[out_id]] <- renderDT({
-      datatable(
+    output[[out_id]] <- DT::renderDT({
+      DT::datatable(
         df_q[, c("publish_date", "query", "source", "title", "link", "url")],
         escape = FALSE,
         rownames = FALSE,
@@ -96,4 +102,4 @@ server <- function(input, output, session) {
   })
 }
 
-shinyApp(ui, server)
+shiny::shinyApp(ui, server)
