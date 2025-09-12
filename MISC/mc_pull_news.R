@@ -71,6 +71,7 @@ get_news <- function() {
   queries <- c(
     "blackstone language:en",
     "kkr language:en",
+    '"apollo management" language:en',
     '"carlyle group" language:en',
     "tpg language:en",
     '"blue owl" language:en',
@@ -89,6 +90,7 @@ get_news <- function() {
       nm = c(
         "Blackstone",
         "KKR",
+        "Apollo Management",
         "Carlyle Group",
         "TPG",
         "Blue Owl",
