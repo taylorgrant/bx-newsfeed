@@ -115,7 +115,7 @@ get_news <- function() {
         nm = c(
           "Blackstone",
           "KKR",
-          "Apollo Management",
+          "Apollo Global",
           "Carlyle Group",
           "TPG",
           "Blue Owl",
