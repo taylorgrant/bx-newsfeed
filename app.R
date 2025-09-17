@@ -54,16 +54,11 @@ server <- function(input, output, session) {
       dplyr::filter(publish_date == Sys.Date()) %>%
       dplyr::arrange(desc(publish_date)) %>%
       mk_links()
-    if (nrow(df) == 0) {
-      # df <- data_all[0, ]
-      return(
-        DT::datatable(
-          data.frame(Message = "No stories found for today."),
-          rownames = FALSE,
-          options = list(dom = 't', paging = FALSE) # just show the message
-        )
-      )
-    }
+    
+    validate(
+      need(nrow(df) > 0, "No stories found for today.")
+    )
+    
     DT::datatable(
       df[, c("publish_date", "query", "source", "title", "link", "url")],
       escape = FALSE,
