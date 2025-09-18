@@ -8,18 +8,13 @@ get_news <- function() {
     dt <- import("datetime")
     # Set the date of the query
     today_r <- Sys.Date()
-    today_py <- dt$date(
-      as.integer(format(today_r, "%Y")),
-      as.integer(format(today_r, "%m")),
-      as.integer(format(today_r, "%d"))
-    )
     # Get API key
     MC_API_KEY = Sys.getenv("MEDIACLOUD_API_KEY")
     search_api = mediacloud.api$SearchApi(MC_API_KEY)
     # Set query parameters
     my_query <- qq
-    start_date <- today_py
-    end_date <- today_py
+    start_date <- today_r
+    end_date <- today_r
     sources = as.integer(c(
       18482,
       1755,
@@ -114,7 +109,7 @@ get_news <- function() {
   sheet_id <- Sys.getenv("MEDIACLOUD_GS_ID")
   target_tab <- "mc_results"
 
-  # Read only existing URLs (fast)
+  # Read only existing URLs
   existing_urls <- tryCatch(
     googlesheets4::read_sheet(
       sheet_id,
