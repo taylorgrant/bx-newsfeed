@@ -1,13 +1,11 @@
 # Function to pull stories from MediaCloud #
 get_news <- function() {
-  
   library(lubridate)
   # Get LA Time
   now_la <- with_tz(Sys.time(), "America/Los_Angeles")
-  
+
   # Run at 8am, 12pm, 4pm, 10pm
-  if (hour(now_la) %in% c(8, 12, 16, 22)) {
-    
+  if (hour(now_la) %in% c(5, 8, 12, 16, 22)) {
     # googlesheets auth
     options(
       gargle_oauth_cache = "/home/rstudio/R/kawasaki_cm360/.secrets",
@@ -16,15 +14,14 @@ get_news <- function() {
       # gargle_verbosity = "debug"
     )
     # googledrive::drive_auth()
-    
-    
+
     mc_news_pull <- function(qq) {
       # set the python environment used by reticulate
       reticulate::use_python(
         "/home/rstudio/.local/share/r-miniconda/envs/bx-newsfeed/bin/python",
         required = TRUE
       )
-      
+
       library(reticulate)
       # libraries
       os <- import("os")
@@ -63,7 +60,7 @@ get_news <- function() {
         source_ids = sources
       )[[1]]
     }
-    
+
     # Set empty DF in case of empty query
     EMPTY_DF <- tibble::tibble(
       language = character(),
@@ -73,24 +70,29 @@ get_news <- function() {
       title = character(),
       url = character()
     )
-    
+
     # Convert list of lists to tibble
     stories_to_df <- function(stories) {
-      if (is.null(stories) || length(stories) == 0) return(EMPTY_DF)
-      
+      if (is.null(stories) || length(stories) == 0) {
+        return(EMPTY_DF)
+      }
+
       df <- purrr::map_dfr(stories, function(x) {
         tibble::tibble(
-          language     = as.character(rlang::`%||%`(x$language, NA_character_)),
-          media_name   = as.character(rlang::`%||%`(x$media_name, NA_character_)),
-          publish_date = as.character(rlang::`%||%`(x$publish_date, NA_character_)),  # <-- force chr
-          source       = as.character(rlang::`%||%`(x$media_name, NA_character_)),
-          title        = as.character(rlang::`%||%`(x$title, NA_character_)),
-          url          = as.character(rlang::`%||%`(x$url, NA_character_))
+          language = as.character(rlang::`%||%`(x$language, NA_character_)),
+          media_name = as.character(rlang::`%||%`(x$media_name, NA_character_)),
+          publish_date = as.character(rlang::`%||%`(
+            x$publish_date,
+            NA_character_
+          )), # <-- force chr
+          source = as.character(rlang::`%||%`(x$media_name, NA_character_)),
+          title = as.character(rlang::`%||%`(x$title, NA_character_)),
+          url = as.character(rlang::`%||%`(x$url, NA_character_))
         )
       })
       df
     }
-    
+
     # Queries to use
     queries <- c(
       "blackstone language:en",
@@ -103,7 +105,7 @@ get_news <- function() {
       '"ares management" language:en',
       '(("private market" NOT "private market value") OR "private assets" OR ("alternative investment" OR "alternative investments" OR "alternative investing" OR "alternative investor")) language:en'
     )
-    
+
     results <- purrr::map(queries, function(q) {
       message(sprintf("[get_news] %s — pulling: %s", Sys.time(), q))
       stories <- mc_news_pull(q) # pull
@@ -124,15 +126,15 @@ get_news <- function() {
           "Private Markets"
         )
       )
-    
+
     all_results <- purrr::imap_dfr(results, ~ dplyr::mutate(.x, query = .y)) |>
       dplyr::mutate(publish_date = as.Date(publish_date)) |>
       dplyr::distinct(url, .keep_all = TRUE) |>
       dplyr::arrange(publish_date)
-    
+
     sheet_id <- Sys.getenv("MEDIACLOUD_GS_ID")
     target_tab <- "mc_results"
-    
+
     # Read only existing URLs (fast)
     existing_urls <- tryCatch(
       googlesheets4::read_sheet(
@@ -144,16 +146,16 @@ get_news <- function() {
         dplyr::pull(url),
       error = function(e) character()
     )
-    
+
     # all_df is your combined, already-deduped + sorted DF
     new_rows <- all_results |>
       dplyr::filter(!is.na(url), url != "") |>
       dplyr::anti_join(tibble::tibble(url = existing_urls), by = "url")
-    
+
     if (nrow(new_rows) > 0) {
       googlesheets4::sheet_append(sheet_id, data = new_rows, sheet = target_tab)
     }
-    
+
     # return something useful
     invisible(list(
       appended = nrow(new_rows),
